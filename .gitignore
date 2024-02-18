@@ -27,3 +27,4 @@ dist-ssr
 *.sw?
 **/migrations
 **sandbox/
+**build/
