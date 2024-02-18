@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['src\\app.py'],
+    ['src\\App.py'],
     pathex=['env\\Lib\\site-packages'],
     binaries=[],
-    datas=[('src/static', 'static'), ('src/templates', 'templates')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

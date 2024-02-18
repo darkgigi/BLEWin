@@ -3,7 +3,10 @@ from tkinter import messagebox
 from bleak import *
 import asyncio
 import threading
+import subprocess
 
+def install_dependencies():
+    subprocess.run(['pip', 'install', '-r', 'requirements.txt'])
 
 COLOR_NOT_FOUND = "#f26f68"
 COLOR_FOUND = "#44dddd"
@@ -153,4 +156,5 @@ class Window(tk.Tk):
         messagebox.showinfo("Desconexión", "Todos los dispositivos desconectados correctamente.")
         return
 if __name__ == "__main__":
+    install_dependencies()
     asyncio.run(App().exec())
