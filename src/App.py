@@ -48,13 +48,12 @@ class Window(tk.Tk):
         button_disconnect = tk.Button(lf_buttons, text="Desconectar", command=lambda: self.loop.create_task(self.disconnect_device()))
         button_disconnect.grid(column=0, row=4, padx=4, pady=4)
 
-        lf_connection = tk.LabelFrame(self, text="Conexiones:")
+        lf_connection = tk.LabelFrame(self, text="Estado:")
         lf_connection.grid(column=1, row=0, padx=5, pady=10)
 
         b_connect = tk.Button(lf_connection,
                                 text="Conectar todos",
-                                command=None,
-                                state="disabled")  # ,
+                                command=lambda: self.loop.create_task(self.connect_all()))
 
         b_connect.grid(column=1, row=3, padx=4, pady=4)
         b_close = tk.Button(lf_connection,
@@ -177,6 +176,29 @@ class Window(tk.Tk):
             connections_copy.pop((name,address))
         connections = connections_copy
         messagebox.showinfo("Desconexión", "Todos los dispositivos desconectados correctamente.")
+        return
+    
+    async def connect_all(self):
+        if not self.type1 and not self.type2 and not self.type3:
+            messagebox.showerror("Error de conexión", "No se ha encontrado ningún dispositivo")
+            return
+        addresses_connected = [address for _,address in connections.keys()]
+        if self.type1 and self.type1 not in addresses_connected:
+            connection = BleakClient(self.type1)
+            await connection.connect()
+            self.check_type(self.type1, connection)
+            connections[("LegMonitor",self.type1)] = connection
+        if self.type2 and self.type2 not in addresses_connected:
+            connection = BleakClient(self.type2)
+            await connection.connect()
+            self.check_type(self.type2, connection)
+            connections[("WristMonitor",self.type2)] = connection
+        if self.type3 and self.type3 not in addresses_connected:
+            connection = BleakClient(self.type3)
+            await connection.connect()
+            self.check_type(self.type3, connection)
+            connections[("ChestMonitor",self.type3)] = connection
+        messagebox.showinfo("Conexión", "Todos los dispositivos conectados correctamente.")
         return
     
 if __name__ == "__main__":
