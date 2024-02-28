@@ -27,14 +27,14 @@ class App:
 
 class Window(tk.Tk):
     def __init__(self,loop):
-        self.root = tk.Tk()
-        self.root.title("BLEWin")
+        super().__init__()
+        self.title("BLEWin")
         self.loop = loop
         self.type1 = None
         self.type2 = None
         self.type3 = None
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        lf_buttons= tk.LabelFrame(self.root, text="Dispositivos: ")
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+        lf_buttons= tk.LabelFrame(self, text="Dispositivos: ")
         lf_buttons.grid(column=0, row=0, padx=10, pady=10)
         self.devices_list = tk.Listbox(lf_buttons, selectmode=tk.SINGLE, width=100, height=20)
         self.devices_list.grid(column=0, row=1, padx=4, pady=4)
@@ -48,7 +48,7 @@ class Window(tk.Tk):
         button_disconnect = tk.Button(lf_buttons, text="Desconectar", command=lambda: self.loop.create_task(self.disconnect_device()))
         button_disconnect.grid(column=0, row=4, padx=4, pady=4)
 
-        lf_connection = tk.LabelFrame(self.root, text="Conexiones:")
+        lf_connection = tk.LabelFrame(self, text="Conexiones:")
         lf_connection.grid(column=1, row=0, padx=5, pady=10)
 
         b_connect = tk.Button(lf_connection,
@@ -76,12 +76,12 @@ class Window(tk.Tk):
 
     async def show(self):
         while True:
-            self.root.update()
+            self.update()
             await asyncio.sleep(.1)
 
     def on_close(self):
         self.loop.stop()
-        self.destroy()
+        super().destroy()
 
     async def discover_devices(self):
         self.restart_txt()
@@ -116,7 +116,7 @@ class Window(tk.Tk):
             return
         address = self.devices_list.get(selected[0]).split(" ")[1]
         name = self.devices_list.get(selected[0]).split(" ")[0]
-        if address in connections and connections[address].is_connected:
+        if (name,address) in connections and connections[(name,address)].is_connected:
             messagebox.showerror("Error de conexión", "Dispositivo ya conectado.")
             return
         try:
@@ -155,7 +155,7 @@ class Window(tk.Tk):
             return
         address = self.devices_list.get(selected[0]).split(" ")[1]
         name = self.devices_list.get(selected[0]).split(" ")[0]
-        if address not in connections:
+        if (name,address) not in connections:
             messagebox.showerror("Error de desconexión", "Dispositivo no conectado.")
             return
         try:
@@ -168,14 +168,23 @@ class Window(tk.Tk):
             messagebox.showerror("Error de desconexión", "Dispositivo no disponible")
 
     async def disconnect_all(self):
-        for address in connections:
-            connection = connections[address]
+        global connections
+        connections_copy = connections.copy()
+        for name,address in connections.keys():
+            connection = connections[(name,address)]
             await connection.disconnect()
             self.check_type(address, connection)
-        connections.clear()
+            connections_copy.pop((name,address))
+        connections = connections_copy
         messagebox.showinfo("Desconexión", "Todos los dispositivos desconectados correctamente.")
         return
     
 if __name__ == "__main__":
     install_dependencies()
-    asyncio.run(App().exec())
+    try:
+        asyncio.run(App().exec())
+    except RuntimeError as e:
+        if str(e) == 'Event loop stopped before Future completed.':
+            pass
+        else:
+            raise e
