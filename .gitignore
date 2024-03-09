@@ -28,3 +28,4 @@ dist-ssr
 **/migrations
 **sandbox/
 **build/
+**tfgenv/
