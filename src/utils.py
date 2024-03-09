@@ -47,7 +47,7 @@ def accRead(br: bytearray) -> list:
 def accint162float32(value) -> float:
     """Convierte un entero de 16 bits en un float de 32 bits"""
 
-    return float(value) * 4.0 / 32768.0
+    return float(value) * 4.0 / 32768.0      # Rango de medición de ±4g. Además, 32768 = 1024 * 32
 
 
 def gyrRead(br: bytearray) -> list:
@@ -61,7 +61,7 @@ def gyrRead(br: bytearray) -> list:
 def gyrint162float32(value) -> float:
     """Convierte un entero de 16 bits en un float de 32 bits"""
 
-    return float(value) * 2000.0 / 32768.0
+    return float(value) * 2000.0 / 32768.0      # Rango de medición de ±2000 grados por segundo. Además, 32768 = 1024 * 32
 
 
 def batRead(br: bytearray) -> list:
@@ -72,8 +72,8 @@ def batRead(br: bytearray) -> list:
     for j in range(0, br2 >> 1):
         aux = br[2 * j:2 * j + 2]
         mf = int.from_bytes(aux, byteorder='little', signed=False)
-        ax = float(mf) * 3.3 / 1023.0
-        ax = 5 * ax / 3
+        ax = float(mf) * 3.3 / 1023.0           # Lectura de un convertidor analógico-digital de 10 bits con referencia a 3.3V
+        ax = 5 * ax / 3                         # 0V = 0%, 3V = 100%
         mr.append(ax)
     return mr
 
@@ -96,7 +96,7 @@ def taRead(br: bytearray) -> list:
     """Convierte un bytearray en una lista de temperaturas ambientales en grados Celsius (float)"""
     
     mr = bytearray2uint16list(br)
-    m_ret = [float(element) / 16.0 + 25 for element in mr]
+    m_ret = [float(element) / 16.0 + 25 for element in mr]      # Escala de 16 bits, 0 = 25ºC, 16 = 26ºC...
     return m_ret
 
 class blemanager():
