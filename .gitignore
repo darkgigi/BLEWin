@@ -29,3 +29,4 @@ dist-ssr
 **sandbox/
 **build/
 **tfgenv/
+*.spec
