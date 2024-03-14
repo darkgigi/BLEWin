@@ -450,7 +450,7 @@ class Window(tk.Tk):
 
 
 if __name__ == "__main__":
-    install_dependencies()
+    
     try:
         asyncio.run(App().exec())
     except RuntimeError as e:
