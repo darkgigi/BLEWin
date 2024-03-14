@@ -103,6 +103,7 @@ class blemanager():
     def __init__(self):
         self.id = None
         self.address = None
+        self.name = None
         self.eda_config = None          #Electrodermal activity configuration
         self.lsl_acc = None             #Accelerometer
         self.lsl_hr = None              #Heart rate
@@ -120,4 +121,10 @@ class blemanager():
         f", eda_config={self.eda_config}, lsl_acc={self.lsl_acc}, lsl_hr={self.lsl_hr}, lsl_bat={self.lsl_bat}"
         f", lsl_br={self.lsl_br}, lsl_ecg={self.lsl_ecg}, lsl_eda={self.lsl_eda}, lsl_gyr={self.lsl_gyr}, lsl_st={self.lsl_st}" 
         f", lsl_ta={self.lsl_ta}, lsl_eda_config={self.lsl_eda_config})")
+    
+    def setData(self, data):
+        self.data = data
+
+    def setHandle(self, handle):
+        self.handle = handle
     

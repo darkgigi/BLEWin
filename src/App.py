@@ -38,6 +38,8 @@ class Window(tk.Tk):
         self.type2 = blemanager()
         self.type1 = blemanager()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.subscribed_connections = []
+
         lf_buttons= tk.LabelFrame(self, text="Dispositivos: ")
         lf_buttons.grid(column=0, row=0, padx=10, pady=10)
         self.devices_list = tk.Listbox(lf_buttons, selectmode=tk.SINGLE, width=100, height=20)
@@ -83,9 +85,9 @@ class Window(tk.Tk):
                             text="Iniciar",
                             command=lambda: self.loop.create_task(self.start_measurement()))
         b_start.grid(column=2, row=0, padx=4, pady=4)
-        b_stop = tk.Button(lf_measurement,
-                            text="Detener",
-                            command = None)
+        b_stop = tk.Button(lf_measurement, 
+                           text="Detener", 
+                           command = lambda: self.loop.create_task(self.stop_measurement()))
         b_stop.grid(column=2, row=1, padx=4, pady=4)
 
     async def show(self):
@@ -111,12 +113,15 @@ class Window(tk.Tk):
         for device in devices:
             if device[0] == 'ChestMonitor':
                 self.type3.address = device[1]
+                self.type3.name = device[0]
                 self.txt_chest.config(background=COLOR_FOUND)
             if device[0] == 'WristMonitor':
                 self.type2.address = device[1]
+                self.type2.name = device[0]
                 self.txt_wrist.config(background=COLOR_FOUND)
             if device[0] == 'LegMonitor':
                 self.type1.address = device[1]
+                self.type1.name = device[0]
                 self.txt_leg.config(background=COLOR_FOUND)
             self.devices_list.insert(tk.END, f"{device[0]} {device[1]}")
         if connections:
@@ -260,7 +265,6 @@ class Window(tk.Tk):
                 StreamInfo('Nano33IoT_Leg_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type1.lsl_bat = StreamOutlet(
                 StreamInfo('Nano33IoT_Leg_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
-            print(self.type1)
         if self.type2.address == address and (name:=("WristMonitor",self.type2.address)) in connections:
             connection = connections[name]
             self.type2.eda_config = connection.read_gatt_char(CH_CEDA_SEL)[0]
@@ -297,7 +301,6 @@ class Window(tk.Tk):
                 StreamInfo('Nano33IoT_Chest_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type3.lsl_bat = StreamOutlet(
                 StreamInfo('Nano33IoT_Chest_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
-            print(self.type3)
     
     def restart_blemanager(self, address):
         """Reinicia los valores de los dispositivos BLE que se desconectan"""
@@ -326,69 +329,6 @@ class Window(tk.Tk):
             self.type3.lsl_gyr = None
             self.type3.lsl_bat = None
 
-    def getLegData(self, data):
-        """Obtiene los datos de la pierna"""
-
-        if len(data) != 28:
-            print("Error Data 0x01: Wrong length.")
-            return None, None, None, None
-        else:
-            acc = bytearray(data[0:12])
-            gyr = bytearray(data[12:24])
-            bat = bytearray(data[24:26])
-            ta = bytearray(data[26:28])
-            r_acc = accRead(acc)
-            r_gyr = gyrRead(gyr)
-            r_bat = batRead(bat)
-            r_ta = taRead(ta)
-            return r_acc, r_gyr, r_bat, r_ta
-    
-    def getWristData(self,data):
-        """Obtiene los datos de la muñeca"""
-
-        # TODO: probar si se reciben bien los datos de la muñeca
-        if len(data) != 36:
-            print("Error Data 0x01: Wrong length.")
-            return None, None, None, None, None, None, None
-        else:
-            eda = bytearray(data[0:4])
-            acc = bytearray(data[4:16])
-            gyr = bytearray(data[16:28])
-            bat = bytearray(data[28:30])
-            ta = bytearray(data[30:32])
-            st = bytearray(data[32:34])
-            eda_config = bytearray(data[34:36])
-            r_eda = bytearray2uint16list(eda)
-            r_acc = accRead(acc)
-            r_gyr = gyrRead(gyr)
-            r_bat = batRead(bat)
-            r_ta = taRead(ta)
-            r_st = stRead(st)
-            r_eda_config = bytearray2uint16list(eda_config)
-            return r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
-    
-    def getChestData(self,data):
-        """Obtiene los datos del pecho"""
-
-        # TODO: corregir el error de longitud, el tamaño que recibe es de 72 bytes
-        if len(data) != 64:
-            print("Error Data 0x01: Wrong length.")
-            return None, None, None, None, None, None
-        else:
-            ecg = bytearray(data[0:32])
-            acc = bytearray(data[32:44])
-            gyr = bytearray(data[44:56])
-            br = bytearray(data[56:60])
-            bat = bytearray(data[60:62])
-            ta = bytearray(data[62:64])
-            r_ecg = bytearray2uint16list(ecg)
-            r_acc = accRead(acc)
-            r_gyr = gyrRead(gyr)
-            r_br = bytearray2uint16list(br)
-            r_bat = batRead(bat)
-            r_ta = taRead(ta)
-            return r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta
-
     # TODO: procesar los datos recibidos de los dispositivos
     async def start_measurement(self):
         """Inicia la medición de los dispositivos conectados."""
@@ -396,16 +336,112 @@ class Window(tk.Tk):
             messagebox.showerror("Error de medición", "No se ha conectado ningún dispositivo")
             return
         connected_addresses = [address for _,address in connections.keys()]
-        if self.type1.address in connected_addresses:
-            data = await connections[("LegMonitor",self.type1.address)].read_gatt_char(CH_FRAME)
-            r_acc, r_gyr, r_bat, r_ta = self.getLegData(data)
-        if self.type2.address in connected_addresses:
-            data = await connections[("WristMonitor",self.type2.address)].read_gatt_char(CH_FRAME)
-            r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.getWristData(data)
-        if self.type3.address in connected_addresses:
-            data = await connections[("ChestMonitor",self.type3.address)].read_gatt_char(CH_FRAME)
-            r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.getChestData(data)
+        if self.type1.address in connected_addresses and not self.type1 in self.subscribed_connections:
+            manager = self.MeasurementManager(self.type1, self)
+            self.subscribed_connections.append(self.type1)
+            await connections[("LegMonitor",self.type1.address)].start_notify(CH_FRAME, manager.handle_notification)
+        if self.type2.address in connected_addresses and not self.type2 in self.subscribed_connections:
+            manager = self.MeasurementManager(self.type2, self)
+            self.subscribed_connections.append(self.type2)
+            await connections[("WristMonitor",self.type2.address)].start_notify(CH_FRAME, manager.handle_notification)
+        if self.type3.address in connected_addresses and not self.type3 in self.subscribed_connections:
+            manager = self.MeasurementManager(self.type3, self)
+            self.subscribed_connections.append(self.type3)
+            await connections[("ChestMonitor",self.type3.address)].start_notify(CH_FRAME, manager.handle_notification)
     
+    async def stop_measurement(self):
+        """Detiene la medición de los dispositivos conectados."""
+
+        for tuple in connections:
+            connection = connections[tuple]
+            await connection.stop_notify(CH_FRAME)
+        self.subscribed_connections = []
+
+    class MeasurementManager:
+        def __init__(self, blemanager: blemanager, window):
+            if isinstance(window, Window):
+                self.mblemanager = blemanager
+                self.window = window
+            
+        def handle_notification(self, sender: str, data: bytearray):
+            """Procesa las notificaciones de las características."""
+            if self.mblemanager.name == "LegMonitor":
+                r_acc, r_gyr, r_bat, r_ta = self.getLegData(data)
+                print(r_acc, r_gyr, r_bat, r_ta)
+                # TODO: procesar los datos recibidos de la pierna
+            elif self.mblemanager.name == "WristMonitor":
+                r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.window.getWristData(data)
+                # TODO: procesar los datos recibidos de la muñeca
+            elif self.mblemanager.name == "ChestMonitor":
+                r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.window.getChestData(data)
+                # TODO: procesar los datos recibidos del pecho
+
+        def getLegData(self, data):
+            """Obtiene los datos de la pierna"""
+
+            if len(data) != 28:
+                messagebox.showerror("Error de datos", "Longitud incorrecta")
+                return None, None, None, None
+            else:
+                acc = bytearray(data[0:12])
+                gyr = bytearray(data[12:24])
+                bat = bytearray(data[24:26])
+                ta = bytearray(data[26:28])
+                r_acc = accRead(acc)
+                r_gyr = gyrRead(gyr)
+                r_bat = batRead(bat)
+                r_ta = taRead(ta)
+                return r_acc, r_gyr, r_bat, r_ta
+    
+        def getWristData(self,data):
+            """Obtiene los datos de la muñeca"""
+
+            # TODO: probar si se reciben bien los datos de la muñeca
+            if len(data) != 36:
+                messagebox.showerror("Error de datos", "Longitud incorrecta")
+                return None, None, None, None, None, None, None
+            else:
+                eda = bytearray(data[0:4])
+                acc = bytearray(data[4:16])
+                gyr = bytearray(data[16:28])
+                bat = bytearray(data[28:30])
+                ta = bytearray(data[30:32])
+                st = bytearray(data[32:34])
+                eda_config = bytearray(data[34:36])
+                r_eda = bytearray2uint16list(eda)
+                r_acc = accRead(acc)
+                r_gyr = gyrRead(gyr)
+                r_bat = batRead(bat)
+                r_ta = taRead(ta)
+                r_st = stRead(st)
+                r_eda_config = bytearray2uint16list(eda_config)
+                return r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
+        
+        def getChestData(self,data):
+            """Obtiene los datos del pecho"""
+
+            # TODO: corregir el error de longitud, el tamaño que recibe es de 72 bytes
+            if len(data) != 64:
+                messagebox.showerror("Error de datos", "Longitud incorrecta")
+                return None, None, None, None, None, None
+            else:
+                ecg = bytearray(data[0:32])
+                acc = bytearray(data[32:44])
+                gyr = bytearray(data[44:56])
+                br = bytearray(data[56:60])
+                bat = bytearray(data[60:62])
+                ta = bytearray(data[62:64])
+                r_ecg = bytearray2uint16list(ecg)
+                r_acc = accRead(acc)
+                r_gyr = gyrRead(gyr)
+                r_br = bytearray2uint16list(br)
+                r_bat = batRead(bat)
+                r_ta = taRead(ta)
+                return r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta
+
+        
+
+
 if __name__ == "__main__":
     install_dependencies()
     try:
