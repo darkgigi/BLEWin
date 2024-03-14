@@ -368,12 +368,19 @@ class Window(tk.Tk):
             if self.mblemanager.name == "LegMonitor":
                 r_acc, r_gyr, r_bat, r_ta = self.getLegData(data)
                 print(r_acc, r_gyr, r_bat, r_ta)
-                # TODO: procesar los datos recibidos de la pierna
+                for e in range(0, len(r_acc), 3):
+                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
+                for e in range(0, len(r_gyr), 3):
+                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
+                for e in r_bat:
+                    self.mblemanager.lsl_bat.push_sample([e])
+                for e in r_ta:
+                    self.mblemanager.lsl_ta.push_sample([e])
             elif self.mblemanager.name == "WristMonitor":
-                r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.window.getWristData(data)
+                r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.getWristData(data)
                 # TODO: procesar los datos recibidos de la muñeca
             elif self.mblemanager.name == "ChestMonitor":
-                r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.window.getChestData(data)
+                r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.getChestData(data)
                 # TODO: procesar los datos recibidos del pecho
 
         def getLegData(self, data):
