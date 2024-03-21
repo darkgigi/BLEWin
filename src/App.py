@@ -7,6 +7,7 @@ import subprocess
 from pylsl import StreamInfo, StreamOutlet
 from utils import *
 import pylsl as lsl
+import numpy as np
 
 def install_dependencies():
     subprocess.run(['pip', 'install', '-r', 'requirements.txt'])
@@ -21,6 +22,13 @@ CH_FRAME = "0000acc5-0000-1000-8000-00805f9b34fb"
 CH_CEDA_SEL = "0000acc6-0000-1000-8000-00805f9b34fb"
 
 connections: dict[tuple() : BleakClient] = dict()
+list_RR = [0, 0, 0, 0, 0, 0, 0]
+#manuDetector = RTQRS(sizeBuffer=250, overlap=50)
+lastRR = 0
+rr_aux = 0
+list_RR = [0, 0, 0, 0, 0, 0, 0]
+paso = 200
+datos = []
 
 class App:
     async def exec(self):
@@ -301,6 +309,7 @@ class Window(tk.Tk):
                 StreamInfo('Nano33IoT_Chest_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type3.lsl_bat = StreamOutlet(
                 StreamInfo('Nano33IoT_Chest_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+
     
     def restart_blemanager(self, address):
         """Reinicia los valores de los dispositivos BLE que se desconectan"""
@@ -367,7 +376,6 @@ class Window(tk.Tk):
             """Procesa las notificaciones de las características."""
             if self.mblemanager.name == "LegMonitor":
                 r_acc, r_gyr, r_bat, r_ta = self.getLegData(data)
-                print(r_acc, r_gyr, r_bat, r_ta)
                 for e in range(0, len(r_acc), 3):
                     self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
                 for e in range(0, len(r_gyr), 3):
@@ -381,7 +389,37 @@ class Window(tk.Tk):
                 # TODO: procesar los datos recibidos de la muñeca
             elif self.mblemanager.name == "ChestMonitor":
                 r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.getChestData(data)
-                # TODO: procesar los datos recibidos del pecho
+                for e in r_ecg:
+                    self.mblemanager.lsl_ecg.push_sample([e])
+                    # TODO: procesar los datos de la frecuencia cardíaca
+                    '''
+                    datos.append(e)
+                    if len(datos) == 250:
+                        res = manuDetector.realTimeQRSDetection(np.array(datos))
+                        if len(res) > 0:
+                            for element in res:
+                                rr_aux = list_RR.pop(0)
+                                rr_aux = 12480/(element - lastRR)
+                                list_RR.append(rr_aux)
+                                self.mblemanager.lsl_hr.push_sample([np.median(list_RR)])
+                                lastRR = element
+                            if lastRR > 210:
+                                datos = []
+                                lastRR = lastRR - 250
+                            else:
+                                datos = datos[200:250]
+                                lastRR = lastRR -200
+                    '''
+                for e in range(0, len(r_acc), 3):
+                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
+                for e in range(0, len(r_gyr), 3):
+                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
+                for e in r_br:
+                    self.mblemanager.lsl_br.push_sample([e])
+                for e in r_bat:
+                    self.mblemanager.lsl_bat.push_sample([e])
+                for e in r_ta:
+                    self.mblemanager.lsl_ta.push_sample([e])
 
         def getLegData(self, data):
             """Obtiene los datos de la pierna"""
