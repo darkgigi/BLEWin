@@ -1,3 +1,4 @@
+import random
 import tkinter as tk
 from tkinter import messagebox
 from bleak import *
@@ -191,10 +192,14 @@ class Window(tk.Tk):
     async def disconnect_device(self):
         """Desconecta el dispositivo seleccionado."""
 
+        
+
         selected = self.devices_list.curselection()
         if not selected:
             messagebox.showerror("Error de desconexión", "Dispositivo no seleccionado.")
             return
+        if self.subscribed_connections != []:
+            await self.stop_measurement()
         address = self.devices_list.get(selected[0]).split(" ")[1]
         name = self.devices_list.get(selected[0]).split(" ")[0]
         if (name,address) not in connections:
@@ -212,6 +217,9 @@ class Window(tk.Tk):
 
     async def disconnect_all(self):
         """Desconecta todos los dispositivos conectados."""
+
+        if self.subscribed_connections != []:
+            await self.stop_measurement()
 
         global connections
         connections_copy = connections.copy()
@@ -363,7 +371,9 @@ class Window(tk.Tk):
 
         for tuple in connections:
             connection = connections[tuple]
-            await connection.stop_notify(CH_FRAME)
+            subscribed_addresses = [device.address for device in self.subscribed_connections]
+            if connection.address in subscribed_addresses:
+                await connection.stop_notify(CH_FRAME)
         self.subscribed_connections = []
 
     class MeasurementManager:
@@ -410,6 +420,8 @@ class Window(tk.Tk):
                                 datos = datos[200:250]
                                 lastRR = lastRR -200
                     '''
+                    #Valores aleatorios entre 60 y 180 para asegurar que se capturen los datos
+                    self.mblemanager.lsl_hr.push_sample([random.randint(60, 180)])
                 for e in range(0, len(r_acc), 3):
                     self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
                 for e in range(0, len(r_gyr), 3):
