@@ -49,10 +49,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Set up Python
         uses: actions/setup-python@v2
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@master
         env:
@@ -65,3 +61,16 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.language=py
             -Dsonar.python.coverage.reportPaths=coverage.xml
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+    # TODO: Añadir test  
