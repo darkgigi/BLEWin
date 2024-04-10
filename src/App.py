@@ -309,7 +309,6 @@ class Window(ctk.CTk):
                 StreamInfo('Nano33IoT_Leg_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
         if self.type2.address == address and (name:=("WristMonitor",self.type2.address)) in connections:
             connection = connections[name]
-            self.type2.eda_config = connection.read_gatt_char(CH_CEDA_SEL)[0]
             self.type2.id = 2
 
             self.type2.lsl_eda = StreamOutlet(
@@ -441,7 +440,6 @@ class Window(ctk.CTk):
         CTkMessagebox(title="Desconexión", message="Todos los dispositivos desconectados correctamente.", icon="check")
         return
     
-     # TODO: procesar los datos recibidos de los dispositivos
     async def start_measurement(self):
         """Inicia la medición de los dispositivos conectados."""
         if not connections:
@@ -508,7 +506,20 @@ class Window(ctk.CTk):
                     self.mblemanager.lsl_ta.push_sample([e])
             elif self.mblemanager.name == "WristMonitor":
                 r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.getWristData(data)
-                # TODO: procesar los datos recibidos de la muñeca
+                for e in r_eda:
+                    self.mblemanager.lsl_eda.push_sample([e])
+                for e in range(0, len(r_acc), 3):
+                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
+                for e in range(0, len(r_gyr), 3):
+                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
+                for e in r_bat:
+                    self.mblemanager.lsl_bat.push_sample([e])
+                for e in r_ta:
+                    self.mblemanager.lsl_ta.push_sample([e])
+                for e in r_st:
+                    self.mblemanager.lsl_st.push_sample([e])
+                for e in r_eda_config:
+                    self.mblemanager.lsl_eda_config.push_sample([e])
             elif self.mblemanager.name == "ChestMonitor":
                 r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.getChestData(data)
                 for e in r_ecg:
