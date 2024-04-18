@@ -1,18 +1,16 @@
 import customtkinter as ctk
 from PIL import Image, ImageTk
-from bleak import *
+from bleak import BleakClient, BleakScanner
 import asyncio
 import subprocess
 from utils import *
-from CTkMessagebox import *
+from CTkMessagebox import CTkMessagebox
 import random
 from pylsl import StreamInfo, StreamOutlet
 import pylsl as lsl
 import numpy as np
 import webbrowser
-
-def install_dependencies():
-    subprocess.run(['pip', 'install', '-r', 'requirements.txt'])
+import os
 
 COLOR_NOT_FOUND = "#e85a5a"
 COLOR_FOUND = "#82c2f0"
@@ -38,7 +36,7 @@ datos = []
 class App:
     async def exec(self):
         self.window = Window(asyncio.get_event_loop())
-        await self.window.show()
+        await self.window._show()
 
 
 class Window(ctk.CTk):
@@ -50,7 +48,7 @@ class Window(ctk.CTk):
         self.type2 = blemanager()
         self.type1 = blemanager()
         self.is_closed = None
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.subscribed_connections = []
         self.is_closed = False
         self.radiobuttons = []
@@ -83,12 +81,12 @@ class Window(ctk.CTk):
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Modo:")
         self.appearance_mode_label.grid(row=6, column=0, padx=20, pady=(10, 0))
         self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=["Claro", "Oscuro", "Sistema"],
-                                                                       command=self.change_appearance_mode_event)
+                                                                       command=self._change_appearance_mode_event)
         self.appearance_mode_optionemenu.grid(row=7, column=0, padx=20, pady=(10, 10))
         self.scaling_label = ctk.CTkLabel(self.sidebar_frame, text="Escalado IU:", anchor="w")
         self.scaling_label.grid(row=8, column=0, padx=20, pady=(10, 0))
         self.scaling_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=["80%", "90%", "100%", "110%", "120%"],
-                                                               command=self.change_scaling_event)
+                                                               command=self._change_scaling_event)
         self.scaling_optionemenu.grid(row=9, column=0, padx=20, pady=(10, 20))
 
         self.appearance_mode_optionemenu.set("Claro")
@@ -163,7 +161,7 @@ class Window(ctk.CTk):
                            command = lambda: asyncio.create_task(self.stop_measurement()))
         b_stop.grid(column=0, row=2, padx=20, pady=10)
        
-    async def show(self):
+    async def _show(self):
         """Muestra la ventana y comienza el bucle de eventos."""
 
         while not self.is_closed:
@@ -171,14 +169,13 @@ class Window(ctk.CTk):
             await asyncio.sleep(.1)
             
 
-    def on_close(self):
+    def _on_close(self):
         """Detiene el bucle de eventos y cierra la ventana."""
         self.is_closed = True
         self.loop.stop()
         super().destroy()
 
-    def change_appearance_mode_event(self, new_appearance_mode: str):
-        mode = ctk.get_appearance_mode()
+    def _change_appearance_mode_event(self, new_appearance_mode: str):
         if new_appearance_mode == "Claro":
             mode = "Light"
         elif new_appearance_mode == "Oscuro":
@@ -187,39 +184,51 @@ class Window(ctk.CTk):
             mode = "System"
         ctk.set_appearance_mode(mode)
 
-    def change_scaling_event(self, new_scaling: str):
+    def _change_scaling_event(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
         ctk.set_widget_scaling(new_scaling_float)    
 
     async def discover_devices(self):
         """Busca dispositivos BLE disponibles y los muestra en la lista de dispositivos."""
-
+    
         self.restart_txt()
         discovered = await BleakScanner.discover()
         devices = [(d.name, d.address) for d in discovered]
-
+    
+        self._destroy_radiobuttons()
+        self._create_radiobuttons(devices)
+        self._update_connections()
+    
+    def _destroy_radiobuttons(self):
         for radiobutton in self.radiobuttons:
             radiobutton.destroy()
         self.radiobuttons = []
-
+    
+    def _create_radiobuttons(self, devices):
         for device in devices:
-            if device[0] == 'ChestMonitor':
-                self.type3.address = device[1]
-                self.type3.name = device[0]
-                self.txt_chest.configure(fg_color=COLOR_FOUND)
-            if device[0] == 'WristMonitor':
-                self.type2.address = device[1]
-                self.type2.name = device[0]
-                self.txt_wrist.configure(fg_color=COLOR_FOUND)
-            if device[0] == 'LegMonitor':
-                self.type1.address = device[1]
-                self.type1.name = device[0]
-                self.txt_leg.configure(fg_color=COLOR_FOUND)
-            
-            radiobutton = ctk.CTkRadioButton(self.scrollable_frame, text=f"{device[0]} {device[1]}", variable=self.radio_var, value=f"{device[0]} {device[1]}")
-            radiobutton.grid(sticky="w", padx=5, pady=5)
-            self.radiobuttons.append(radiobutton)
-
+            self._update_device_color(device)
+            self._create_radiobutton(device)
+    
+    def _update_device_color(self, device):
+        if device[0] == 'ChestMonitor':
+            self.type3.address = device[1]
+            self.type3.name = device[0]
+            self.txt_chest.configure(fg_color=COLOR_FOUND)
+        if device[0] == 'WristMonitor':
+            self.type2.address = device[1]
+            self.type2.name = device[0]
+            self.txt_wrist.configure(fg_color=COLOR_FOUND)
+        if device[0] == 'LegMonitor':
+            self.type1.address = device[1]
+            self.type1.name = device[0]
+            self.txt_leg.configure(fg_color=COLOR_FOUND)
+    
+    def _create_radiobutton(self, device):
+        radiobutton = ctk.CTkRadioButton(self.scrollable_frame, text=f"{device[0]} {device[1]}", variable=self.radio_var, value=f"{device[0]} {device[1]}")
+        radiobutton.grid(sticky="w", padx=5, pady=5)
+        self.radiobuttons.append(radiobutton)
+    
+    def _update_connections(self):
         if connections:
             for name,address in connections:
                 if address == self.type3.address:
@@ -232,6 +241,8 @@ class Window(ctk.CTk):
                 radiobutton = ctk.CTkRadioButton(self.scrollable_frame, text=f"{name} {address}", variable=self.radio_var, value=f"{name} {address}")
                 radiobutton.grid(sticky="w", padx=5, pady=5)
                 self.radiobuttons.append(radiobutton)
+
+    
 
     async def connect_device(self):
         """Conecta el dispositivo seleccionado de la lista de dispositivos."""
@@ -253,32 +264,26 @@ class Window(ctk.CTk):
             
             self.initialite_blemanager(address)
             CTkMessagebox(title="Conexión", message="Dispositivo conectado exitosamente.", icon="check")
-        except Exception as e:
+        except Exception:
             CTkMessagebox(title="Error de conexión", message="Dispositivo no disponible", icon="cancel")
 
 
     def check_type(self, address, connection: BleakClient):
         """Actualiza el color de los labels de estado de los dispositivos encontrados y conectados."""
-
+    
         subscribed_addresses = [device.address for device in self.subscribed_connections]
-        if address == self.type1.address and connection.is_connected and address in subscribed_addresses:
-            self.txt_leg.configure(fg_color=COLOR_BUTTON_FOCUS)
-        elif address == self.type1.address and connection.is_connected:
-            self.txt_leg.configure(fg_color=COLOR_CONNECT)
-        elif address == self.type1.address and not connection.is_connected:
-            self.txt_leg.configure(fg_color=COLOR_FOUND)
-        if  address == self.type2.address and connection.is_connected and address in subscribed_addresses:
-            self.txt_wrist.configure(fg_color=COLOR_BUTTON_FOCUS)
-        elif  address == self.type2.address and connection.is_connected:
-            self.txt_wrist.configure(fg_color=COLOR_CONNECT)
-        elif  address == self.type2.address and not connection.is_connected:
-            self.txt_wrist.configure(fg_color=COLOR_FOUND)
-        if  address == self.type3.address and connection.is_connected and address in subscribed_addresses:
-            self.txt_chest.configure(fg_color=COLOR_BUTTON_FOCUS)
-        elif address == self.type3.address and connection.is_connected:
-            self.txt_chest.configure(fg_color=COLOR_CONNECT)
-        elif  address == self.type3.address and not connection.is_connected:
-            self.txt_chest.configure(fg_color=COLOR_FOUND)
+    
+        self._update_device_status(address, connection, self.type1.address, self.txt_leg, subscribed_addresses)
+        self._update_device_status(address, connection, self.type2.address, self.txt_wrist, subscribed_addresses)
+        self._update_device_status(address, connection, self.type3.address, self.txt_chest, subscribed_addresses)
+    
+    def _update_device_status(self, address, connection, device_address, txt_device, subscribed_addresses):
+        if address == device_address and connection.is_connected and address in subscribed_addresses:
+            txt_device.configure(fg_color=COLOR_BUTTON_FOCUS)
+        elif address == device_address and connection.is_connected:
+            txt_device.configure(fg_color=COLOR_CONNECT)
+        elif address == device_address and not connection.is_connected:
+            txt_device.configure(fg_color=COLOR_FOUND)
 
     def restart_txt(self):
         """Reinicia el color de los labels de estado de los dispositivos."""
@@ -297,7 +302,6 @@ class Window(ctk.CTk):
             CTkMessagebox(title="Error de conexión", message="No se ha conectado ningún dispositivo", icon="cancel")
             return
         if self.type1.address == address and (name:=("LegMonitor",self.type1.address)) in connections:
-            connection = connections[name]
             self.type1.id = 1
             self.type1.lsl_ta = StreamOutlet(
                 StreamInfo('Nano33IoT_Leg_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
@@ -308,7 +312,6 @@ class Window(ctk.CTk):
             self.type1.lsl_bat = StreamOutlet(
                 StreamInfo('Nano33IoT_Leg_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
         if self.type2.address == address and (name:=("WristMonitor",self.type2.address)) in connections:
-            connection = connections[name]
             self.type2.id = 2
 
             self.type2.lsl_eda = StreamOutlet(
@@ -326,7 +329,6 @@ class Window(ctk.CTk):
             self.type2.lsl_bat = StreamOutlet(
                 StreamInfo('Nano33IoT_Wrist_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
         if self.type3.address == address and (name:=("ChestMonitor",self.type3.address)) in connections:
-            connection = connections[name]
             self.type3.id = 3
             self.type3.lsl_ecg = StreamOutlet(
                 StreamInfo('Nano33IoT_Chest_ECG', 'ECG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
@@ -420,8 +422,7 @@ class Window(ctk.CTk):
             connections[("ChestMonitor",self.type3.address)] = connection
             self.initialite_blemanager(self.type3.address)
         CTkMessagebox(title="Conexión", message="Todos los dispositivos conectados correctamente.", icon="check")
-        return
-    
+        
     async def disconnect_all(self):
         """Desconecta todos los dispositivos conectados."""
 
@@ -438,27 +439,26 @@ class Window(ctk.CTk):
             connections_copy.pop((name,address))
         connections = connections_copy
         CTkMessagebox(title="Desconexión", message="Todos los dispositivos desconectados correctamente.", icon="check")
-        return
-    
+        
     async def start_measurement(self):
         """Inicia la medición de los dispositivos conectados."""
         if not connections:
             CTkMessagebox(title="Error de medición", message="No se ha conectado ningún dispositivo", icon="cancel")
             return
         connected_addresses = [address for _,address in connections.keys()]
-        if self.type1.address in connected_addresses and not self.type1 in self.subscribed_connections:
+        if self.type1.address in connected_addresses and self.type1 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type1, self)
             self.subscribed_connections.append(self.type1)
             connection = connections[("LegMonitor",self.type1.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
             self.check_type(self.type1.address, connection)
-        if self.type2.address in connected_addresses and not self.type2 in self.subscribed_connections:
+        if self.type2.address in connected_addresses and self.type2 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type2, self)
             self.subscribed_connections.append(self.type2)
             connection = connections[("WristMonitor",self.type2.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
             self.check_type(self.type2.address, connection)
-        if self.type3.address in connected_addresses and not self.type3 in self.subscribed_connections:
+        if self.type3.address in connected_addresses and self.type3 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type3, self)
             self.subscribed_connections.append(self.type3)
             connection = connections[("ChestMonitor",self.type3.address)]
@@ -495,68 +495,35 @@ class Window(ctk.CTk):
         def handle_notification(self, sender: str, data: bytearray):
             """Procesa las notificaciones de las características."""
             if self.mblemanager.name == "LegMonitor":
-                r_acc, r_gyr, r_bat, r_ta = self.getLegData(data)
-                for e in range(0, len(r_acc), 3):
-                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
-                for e in range(0, len(r_gyr), 3):
-                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
-                for e in r_bat:
-                    self.mblemanager.lsl_bat.push_sample([e])
-                for e in r_ta:
-                    self.mblemanager.lsl_ta.push_sample([e])
+                r_acc, r_gyr, r_bat, r_ta = self.get_leg_data(data)
+                self._process_data(r_acc, r_gyr, r_bat, r_ta)
             elif self.mblemanager.name == "WristMonitor":
-                r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.getWristData(data)
-                for e in r_eda:
-                    self.mblemanager.lsl_eda.push_sample([e])
-                for e in range(0, len(r_acc), 3):
-                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
-                for e in range(0, len(r_gyr), 3):
-                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
-                for e in r_bat:
-                    self.mblemanager.lsl_bat.push_sample([e])
-                for e in r_ta:
-                    self.mblemanager.lsl_ta.push_sample([e])
-                for e in r_st:
-                    self.mblemanager.lsl_st.push_sample([e])
-                for e in r_eda_config:
-                    self.mblemanager.lsl_eda_config.push_sample([e])
+                r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.get_wrist_data(data)
+                self._process_data(r_acc, r_gyr, r_bat, r_ta)
+                self._process_single_data(r_eda, self.mblemanager.lsl_eda)
+                self._process_single_data(r_st, self.mblemanager.lsl_st)
+                self._process_single_data(r_eda_config, self.mblemanager.lsl_eda_config)
             elif self.mblemanager.name == "ChestMonitor":
-                r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.getChestData(data)
-                for e in r_ecg:
-                    self.mblemanager.lsl_ecg.push_sample([e])
-                    # TODO: procesar los datos de la frecuencia cardíaca
-                    '''
-                    datos.append(e)
-                    if len(datos) == 250:
-                        res = manuDetector.realTimeQRSDetection(np.array(datos))
-                        if len(res) > 0:
-                            for element in res:
-                                rr_aux = list_RR.pop(0)
-                                rr_aux = 12480/(element - lastRR)
-                                list_RR.append(rr_aux)
-                                self.mblemanager.lsl_hr.push_sample([np.median(list_RR)])
-                                lastRR = element
-                            if lastRR > 210:
-                                datos = []
-                                lastRR = lastRR - 250
-                            else:
-                                datos = datos[200:250]
-                                lastRR = lastRR -200
-                    '''
-                    #Valores aleatorios entre 60 y 180 para asegurar que se capturen los datos
-                    self.mblemanager.lsl_hr.push_sample([random.randint(60, 180)])
-                for e in range(0, len(r_acc), 3):
-                    self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
-                for e in range(0, len(r_gyr), 3):
-                    self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
-                for e in r_br:
-                    self.mblemanager.lsl_br.push_sample([e])
-                for e in r_bat:
-                    self.mblemanager.lsl_bat.push_sample([e])
-                for e in r_ta:
-                    self.mblemanager.lsl_ta.push_sample([e])
+                r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.get_chest_data(data)
+                self._process_data(r_acc, r_gyr, r_bat, r_ta)
+                self._process_single_data(r_ecg, self.mblemanager.lsl_ecg)
+                self._process_single_data(r_br, self.mblemanager.lsl_br)
+        
+        def _process_data(self, r_acc, r_gyr, r_bat, r_ta):
+            for e in range(0, len(r_acc), 3):
+                self.mblemanager.lsl_acc.push_sample(r_acc[e:e + 3])
+            for e in range(0, len(r_gyr), 3):
+                self.mblemanager.lsl_gyr.push_sample(r_gyr[e:e + 3])
+            for e in r_bat:
+                self.mblemanager.lsl_bat.push_sample([e])
+            for e in r_ta:
+                self.mblemanager.lsl_ta.push_sample([e])
+        
+        def _process_single_data(self, r_data, lsl_stream):
+            for e in r_data:
+                lsl_stream.push_sample([e])
 
-        def getLegData(self, data):
+        def get_leg_data(self, data):
             """Obtiene los datos de la pierna"""
 
             if len(data) != 28:
@@ -573,10 +540,9 @@ class Window(ctk.CTk):
                 r_ta = taRead(ta)
                 return r_acc, r_gyr, r_bat, r_ta
     
-        def getWristData(self,data):
+        def get_wrist_data(self,data):
             """Obtiene los datos de la muñeca"""
 
-            # TODO: probar si se reciben bien los datos de la muñeca
             if len(data) != 36:
                 CTkMessagebox(title="Error de datos", message="Longitud incorrecta", icon="cancel")
                 return None, None, None, None, None, None, None
@@ -597,10 +563,9 @@ class Window(ctk.CTk):
                 r_eda_config = bytearray2uint16list(eda_config)
                 return r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
         
-        def getChestData(self,data):
+        def get_chest_data(self,data):
             """Obtiene los datos del pecho"""
 
-            # TODO: corregir el error de longitud, el tamaño que recibe es de 72 bytes
             if len(data) != 64:
                 CTkMessagebox(title="Error de datos", message="Longitud incorrecta", icon="cancel")
                 return None, None, None, None, None, None
