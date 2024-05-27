@@ -104,7 +104,6 @@ class blemanager():
         self.id = None
         self.address = None
         self.name = None
-        self.eda_config = None          #Electrodermal activity configuration
         self.lsl_acc = None             #Accelerometer
         self.lsl_hr = None              #Heart rate
         self.lsl_bat = None             #Battery level

@@ -31,3 +31,9 @@ dist-ssr
 **tfgenv/
 *.spec
 **dist/
+**.csr
+**.crt
+**.key
+**.pfx
+**.iss
+**.exe
