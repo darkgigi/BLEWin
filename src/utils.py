@@ -101,7 +101,7 @@ def ta_read(br: bytearray) -> list:
     m_ret = [float(element) / 16.0 + 25 for element in mr]      # Escala de 16 bits, 0 = 25ºC, 16 = 26ºC...
     return m_ret
 
-def get_eda_siemens(eda: int, eda_config: int):
+def get_eda_siemens(eda, eda_config):
     r1 = 0
     if eda_config == 15:
         r1 = 30300
