@@ -12,7 +12,10 @@ def main():
     ecg_data_path = 'src/csv/ecg_data_1.csv'
     ecg_data_raw = np.loadtxt(ecg_data_path, skiprows = 1, delimiter = ',')
     datos_ecg = ecg_data_raw[:, 1]
-    print(ecg_data_raw.shape)
+    
+    plt.plot(datos_ecg)
+    plt.show()
+
     manuDetector = RTQRS(sizeBuffer=250, overlap=50)
     lastRR = 0
     rr_aux = 0
