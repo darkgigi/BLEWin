@@ -187,7 +187,7 @@ class Window(ctk.CTk):
     async def discover_devices(self):
         """Busca dispositivos BLE disponibles y los muestra en la lista de dispositivos."""
     
-        self.restart_txt()
+        self._restart_txt()
         discovered = await BleakScanner.discover()
         devices = [(d.name, d.address) for d in discovered]
     
@@ -226,13 +226,20 @@ class Window(ctk.CTk):
     
     def _update_connections(self):
         if connections:
+            subscribed_addresses = [device.address for device in self.subscribed_connections]
             for name,address in connections:
-                if address == self.type3.address:
+                if address == self.type3.address and address not in subscribed_addresses:
                     self.txt_chest.configure(fg_color=COLOR_CONNECT)
-                if address == self.type2.address:
+                elif address == self.type3.address and address in subscribed_addresses:
+                    self.txt_chest.configure(fg_color=COLOR_BUTTON_FOCUS)
+                if address == self.type2.address and address not in subscribed_addresses:
                     self.txt_wrist.configure(fg_color=COLOR_CONNECT)
-                if address == self.type1.address:
+                elif address == self.type2.address and address in subscribed_addresses:
+                    self.txt_wrist.configure(fg_color=COLOR_BUTTON_FOCUS)
+                if address == self.type1.address and address not in subscribed_addresses:
                     self.txt_leg.configure(fg_color=COLOR_CONNECT)
+                elif address == self.type1.address and address in subscribed_addresses:
+                    self.txt_leg.configure(fg_color=COLOR_BUTTON_FOCUS)
                 
                 radiobutton = ctk.CTkRadioButton(self.scrollable_frame, text=f"{name} {address}", variable=self.radio_var, value=f"{name} {address}")
                 radiobutton.grid(sticky="w", padx=5, pady=5)
@@ -255,16 +262,16 @@ class Window(ctk.CTk):
         try:
             connection = BleakClient(address)
             await connection.connect()
-            self.check_type(address, connection)
+            self._check_type(address, connection)
             connections[(name,address)] = connection
             
-            self.initialite_blemanager(address)
+            self._initialite_blemanager(address)
             CTkMessagebox(title="Conexión", message="Dispositivo conectado exitosamente.", icon="check")
         except Exception:
             CTkMessagebox(title="Error de conexión", message="Dispositivo no disponible", icon="cancel")
 
 
-    def check_type(self, address, connection: BleakClient):
+    def _check_type(self, address, connection: BleakClient):
         """Actualiza el color de los labels de estado de los dispositivos encontrados y conectados."""
     
         subscribed_addresses = [device.address for device in self.subscribed_connections]
@@ -281,14 +288,14 @@ class Window(ctk.CTk):
         elif address == device_address and not connection.is_connected:
             txt_device.configure(fg_color=COLOR_FOUND)
 
-    def restart_txt(self):
+    def _restart_txt(self):
         """Reinicia el color de los labels de estado de los dispositivos."""
 
         self.txt_leg.configure(fg_color=COLOR_NOT_FOUND)
         self.txt_wrist.configure(fg_color=COLOR_NOT_FOUND)
         self.txt_chest.configure(fg_color=COLOR_NOT_FOUND)
 
-    def initialite_blemanager(self, address):
+    def _initialite_blemanager(self, address):
         """Inicializa los valores de los dispositivos BLE que se conectan"""
 
         if not self.type1 and not self.type2 and not self.type3:
@@ -360,14 +367,14 @@ class Window(ctk.CTk):
         try:
             connection = connections[(name,address)]
             await connection.disconnect()
-            self.check_type(address, connection)
-            self.restart_blemanager(address)
+            self._check_type(address, connection)
+            self._restart_blemanager(address)
             connections.pop((name,address))
             CTkMessagebox(title="Desconexión", message="Dispositivo desconectado correctamente.", icon="check")
         except Exception as e:
             CTkMessagebox(title="Error de desconexión", message="Dispositivo no disponible", icon="cancel")
 
-    def restart_blemanager(self, address):
+    def _restart_blemanager(self, address):
         """Reinicia los valores de los dispositivos BLE que se desconectan"""
 
         connected_addresses = [address for _,address in connections.keys()]
@@ -396,29 +403,33 @@ class Window(ctk.CTk):
     async def connect_all(self):
         """Conecta todos los dispositivos encontrados en la lista de dispositivos."""
 
-        if not self.type1 and not self.type2 and not self.type3:
+        if not self.type1.name and not self.type2.name and not self.type3.name:
             CTkMessagebox(title="Error de conexión", message="No se ha encontrado ningún dispositivo", icon="cancel")
             return
         addresses_connected = [address for _,address in connections.keys()]
-        if self.type1.address and self.type1.address not in addresses_connected:
-            connection = BleakClient(self.type1.address)
-            await connection.connect()
-            self.check_type(self.type1.address, connection)
-            connections[("LegMonitor",self.type1.address)] = connection
-            self.initialite_blemanager(self.type1.address)
-        if self.type2.address and self.type2.address not in addresses_connected:
-            connection = BleakClient(self.type2.address)
-            await connection.connect()
-            self.check_type(self.type2.address, connection)
-            connections[("WristMonitor",self.type2.address)] = connection
-            self.initialite_blemanager(self.type2.address)
-        if self.type3.address and self.type3.address not in addresses_connected:
-            connection = BleakClient(self.type3.address)
-            await connection.connect()
-            self.check_type(self.type3.address, connection)
-            connections[("ChestMonitor",self.type3.address)] = connection
-            self.initialite_blemanager(self.type3.address)
-        CTkMessagebox(title="Conexión", message="Todos los dispositivos conectados correctamente.", icon="check")
+        try:
+            if self.type1.address and self.type1.address not in addresses_connected:
+                connection = BleakClient(self.type1.address)
+                await connection.connect()
+                self._check_type(self.type1.address, connection)
+                connections[("LegMonitor",self.type1.address)] = connection
+                self._initialite_blemanager(self.type1.address)
+            if self.type2.address and self.type2.address not in addresses_connected:
+                connection = BleakClient(self.type2.address)
+                await connection.connect()
+                self._check_type(self.type2.address, connection)
+                connections[("WristMonitor",self.type2.address)] = connection
+                self._initialite_blemanager(self.type2.address)
+            if self.type3.address and self.type3.address not in addresses_connected:
+                connection = BleakClient(self.type3.address)
+                await connection.connect()
+                self._check_type(self.type3.address, connection)
+                connections[("ChestMonitor",self.type3.address)] = connection
+                self._initialite_blemanager(self.type3.address)
+            CTkMessagebox(title="Conexión", message="Todos los dispositivos conectados correctamente.", icon="check")
+        except Exception as e:
+            CTkMessagebox(title="Error de desconexión", message="Un dispositivo no está disponible", icon="cancel")
+        
         
     async def disconnect_all(self):
         """Desconecta todos los dispositivos conectados."""
@@ -428,11 +439,14 @@ class Window(ctk.CTk):
 
         global connections
         connections_copy = connections.copy()
+        if connections_copy == {}:
+            CTkMessagebox(title="Error de desconexión", message="No se ha conectado ningún dispositivo", icon="cancel")
+            return
         for name,address in connections.keys():
             connection = connections[(name,address)]
             await connection.disconnect()
-            self.check_type(address, connection)
-            self.restart_blemanager(address)
+            self._check_type(address, connection)
+            self._restart_blemanager(address)
             connections_copy.pop((name,address))
         connections = connections_copy
         CTkMessagebox(title="Desconexión", message="Todos los dispositivos desconectados correctamente.", icon="check")
@@ -448,20 +462,22 @@ class Window(ctk.CTk):
             self.subscribed_connections.append(self.type1)
             connection = connections[("LegMonitor",self.type1.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type1.address, connection)
+            self._check_type(self.type1.address, connection)
         if self.type2.address in connected_addresses and self.type2 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type2, self)
             self.subscribed_connections.append(self.type2)
             connection = connections[("WristMonitor",self.type2.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type2.address, connection)
+            self._check_type(self.type2.address, connection)
         if self.type3.address in connected_addresses and self.type3 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type3, self)
             self.subscribed_connections.append(self.type3)
             connection = connections[("ChestMonitor",self.type3.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type3.address, connection)
+            self._check_type(self.type3.address, connection)
         CTkMessagebox(title="Medición", message="Medición iniciada.")
+
+        
     
     async def stop_measurement(self):
         """Detiene la medición de los dispositivos conectados."""
@@ -480,7 +496,7 @@ class Window(ctk.CTk):
                     self.subscribed_connections.remove(self.type2)
                 if connection.address == self.type3.address:
                     self.subscribed_connections.remove(self.type3)
-                self.check_type(connection.address, connection)
+                self._check_type(connection.address, connection)
         CTkMessagebox(title="Medición", message="Medición detenida.")
 
     class MeasurementManager:

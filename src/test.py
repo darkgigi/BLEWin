@@ -1,10 +1,10 @@
-import ClisData
+import clis_data
 from matplotlib import pyplot as plt
 import numpy as np
 
 sufix = 'A'
 name_type_3 = 'data_Simulation' + sufix
-clis = ClisData.ClisData()
+clis = clis_data.ClisData()
 
 def test_bat_num_data(baterias, tiempos):
 
