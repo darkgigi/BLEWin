@@ -318,7 +318,7 @@ class Window(ctk.CTk):
             self.type2.id = 2
 
             self.type2.lsl_eda = StreamOutlet(
-                StreamInfo('T2_EDA', 'biosignal:EDA', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
+                StreamInfo('T2_EDA', 'biosignal:EDA', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
             self.type2.lsl_eda_config = StreamOutlet(
                 StreamInfo('T2_EDA_CONFIG', 'biosignal:EDA_CONFIG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
             self.type2.lsl_ta = StreamOutlet(
@@ -615,7 +615,7 @@ class Window(ctk.CTk):
                 r_eda_config = bytearray2uint16list(eda_config)
                 r_eda_us = list()
                 for rs in r_eda:
-                    r_eda_us.append(get_eda_siemens(rs, r_eda_config))
+                    r_eda_us.append(get_eda_siemens(rs, r_eda_config[0]))
                 return r_eda_us, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
         
         def get_chest_data(self,data):
