@@ -520,20 +520,12 @@ class Window(ctk.CTk):
                 r_acc, r_gyr, r_bat, r_ta = self.get_leg_data(data)
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
             elif self.mblemanager.name == "WristMonitor":
-                eda_list = [0] * 26 * 2  # [0]*Fs*window_height
-                eda_over = 26  # 50% window
-                eda_count = 0
+                
                 r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.get_wrist_data(data)
-                for e in r_eda:
-                    self.mblemanager.lsl_eda.push_sample([e])
-                    aux = eda_list.pop(0)
-                    eda_list.append(e)
-                    if eda_count == eda_over:
-                        self.mblemanager.lsl_tonic.push_sample([np.mean(eda_list)])
-                        eda_count = 0
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
                 self._process_single_data(r_st, self.mblemanager.lsl_st)
                 self._process_single_data(r_eda_config, self.mblemanager.lsl_eda_config)
+                self._proccess_eda_data(r_eda)
             elif self.mblemanager.name == "ChestMonitor":
                 r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.get_chest_data(data)
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
@@ -574,6 +566,18 @@ class Window(ctk.CTk):
                     else:
                         self.datos = self.datos[200:250]
                         self.last_rr = self.last_rr - 200
+
+        def _proccess_eda_data(self, r_eda):
+            eda_list = [0] * 26 * 2  # [0]*Fs*window_height
+            eda_over = 26  # 50% window
+            eda_count = 0
+            for e in r_eda:
+                self.mblemanager.lsl_eda.push_sample([e])
+                aux = eda_list.pop(0)
+                eda_list.append(e)
+                if eda_count == eda_over:
+                    self.mblemanager.lsl_tonic.push_sample([np.mean(eda_list)])
+                    eda_count = 0
 
         def get_leg_data(self, data):
             """Obtiene los datos de la pierna"""
