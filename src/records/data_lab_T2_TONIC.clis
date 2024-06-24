@@ -1,0 +1,28 @@
+ver=2.1;compress=GZIP;headerByteSize=1231;,float,4,0,0;header,864;true;
+encrypt=0;checksum=ffabc3213522c4aee4c160515a4093e1;
+<deviceInfo_T2_TONIC><info>
+	<name>T2_TONIC</name>
+	<type>biosignal:TONIC</type>
+	<channel_count>1</channel_count>
+	<channel_format>float32</channel_format>
+	<source_id>OWN</source_id>
+	<nominal_srate>0.000000000000000</nominal_srate>
+	<version>1.100000000000000</version>
+	<created_at>320423.4053875000</created_at>
+	<uid>18c5aee8-5972-4c10-a223-b92fa94c66be</uid>
+	<session_id>default</session_id>
+	<hostname>DESKTOP-3G9RS5B</hostname>
+	<v4address/>
+	<v4data_port>16583</v4data_port>
+	<v4service_port>16583</v4service_port>
+	<v6address/>
+	<v6data_port>16583</v6data_port>
+	<v6service_port>16583</v6service_port>
+	<desc>
+                <socketMarkInfo>__start=1;__stop=2;</socketMarkInfo>
+        <recordGeneralDescriptop/>
+        <recordedSamplesByChannels>0.0</recordedSamplesByChannels>
+        </desc>
+</info>
+</deviceInfo_T2_TONIC>
+

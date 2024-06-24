@@ -4,6 +4,7 @@ from bleak import BleakClient, BleakScanner
 import asyncio
 import subprocess
 from utils import *
+from rtqrs import RTQRS
 from CTkMessagebox import CTkMessagebox
 import random
 from pylsl import StreamInfo, StreamOutlet
@@ -25,13 +26,8 @@ ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
 
 connections: dict[tuple() : BleakClient] = dict()
-list_RR = [0, 0, 0, 0, 0, 0, 0]
-#manuDetector = RTQRS(sizeBuffer=250, overlap=50)
-lastRR = 0
-rr_aux = 0
-list_RR = [0, 0, 0, 0, 0, 0, 0]
-paso = 200
-datos = []
+
+
 
 class App:
     async def exec(self):
@@ -74,7 +70,7 @@ class Window(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="BLEWin",image=self.bluetooth_image, compound="left", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
         self.github_logo_button = ctk.CTkButton(self.sidebar_frame, image=self.github_image, 
-                                                text="V3.0.0", fg_color="transparent", text_color=("gray10", "gray90"), 
+                                                text="V4.0.0", fg_color="transparent", text_color=("gray10", "gray90"), 
                                                 hover_color=("gray70", "gray30"), command=lambda: webbrowser.open("https://github.com/darkgigi/BLEWin"),
                                                 corner_radius=0, height=40, border_spacing=10)
         self.github_logo_button.grid(row=5, column=0, sticky="ew", pady=(0, 0))
@@ -191,7 +187,7 @@ class Window(ctk.CTk):
     async def discover_devices(self):
         """Busca dispositivos BLE disponibles y los muestra en la lista de dispositivos."""
     
-        self.restart_txt()
+        self._restart_txt()
         discovered = await BleakScanner.discover()
         devices = [(d.name, d.address) for d in discovered]
     
@@ -230,13 +226,20 @@ class Window(ctk.CTk):
     
     def _update_connections(self):
         if connections:
+            subscribed_addresses = [device.address for device in self.subscribed_connections]
             for name,address in connections:
-                if address == self.type3.address:
+                if address == self.type3.address and address not in subscribed_addresses:
                     self.txt_chest.configure(fg_color=COLOR_CONNECT)
-                if address == self.type2.address:
+                elif address == self.type3.address and address in subscribed_addresses:
+                    self.txt_chest.configure(fg_color=COLOR_BUTTON_FOCUS)
+                if address == self.type2.address and address not in subscribed_addresses:
                     self.txt_wrist.configure(fg_color=COLOR_CONNECT)
-                if address == self.type1.address:
+                elif address == self.type2.address and address in subscribed_addresses:
+                    self.txt_wrist.configure(fg_color=COLOR_BUTTON_FOCUS)
+                if address == self.type1.address and address not in subscribed_addresses:
                     self.txt_leg.configure(fg_color=COLOR_CONNECT)
+                elif address == self.type1.address and address in subscribed_addresses:
+                    self.txt_leg.configure(fg_color=COLOR_BUTTON_FOCUS)
                 
                 radiobutton = ctk.CTkRadioButton(self.scrollable_frame, text=f"{name} {address}", variable=self.radio_var, value=f"{name} {address}")
                 radiobutton.grid(sticky="w", padx=5, pady=5)
@@ -259,16 +262,16 @@ class Window(ctk.CTk):
         try:
             connection = BleakClient(address)
             await connection.connect()
-            self.check_type(address, connection)
+            self._check_type(address, connection)
             connections[(name,address)] = connection
             
-            self.initialite_blemanager(address)
+            self._initialite_blemanager(address)
             CTkMessagebox(title="Conexión", message="Dispositivo conectado exitosamente.", icon="check")
         except Exception:
             CTkMessagebox(title="Error de conexión", message="Dispositivo no disponible", icon="cancel")
 
 
-    def check_type(self, address, connection: BleakClient):
+    def _check_type(self, address, connection: BleakClient):
         """Actualiza el color de los labels de estado de los dispositivos encontrados y conectados."""
     
         subscribed_addresses = [device.address for device in self.subscribed_connections]
@@ -285,14 +288,14 @@ class Window(ctk.CTk):
         elif address == device_address and not connection.is_connected:
             txt_device.configure(fg_color=COLOR_FOUND)
 
-    def restart_txt(self):
+    def _restart_txt(self):
         """Reinicia el color de los labels de estado de los dispositivos."""
 
         self.txt_leg.configure(fg_color=COLOR_NOT_FOUND)
         self.txt_wrist.configure(fg_color=COLOR_NOT_FOUND)
         self.txt_chest.configure(fg_color=COLOR_NOT_FOUND)
 
-    def initialite_blemanager(self, address):
+    def _initialite_blemanager(self, address):
         """Inicializa los valores de los dispositivos BLE que se conectan"""
 
         if not self.type1 and not self.type2 and not self.type3:
@@ -304,46 +307,48 @@ class Window(ctk.CTk):
         if self.type1.address == address and (name:=("LegMonitor",self.type1.address)) in connections:
             self.type1.id = 1
             self.type1.lsl_ta = StreamOutlet(
-                StreamInfo('Nano33IoT_Leg_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T1_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type1.lsl_acc = StreamOutlet(
-                StreamInfo('Nano33IoT_Leg_ACC', 'ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T1_ACC', 'controller/biosignal:ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type1.lsl_gyr = StreamOutlet(
-                StreamInfo('Nano33IoT_Leg_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T1_GYR', 'controller/biosignal:GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type1.lsl_bat = StreamOutlet(
-                StreamInfo('Nano33IoT_Leg_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+                StreamInfo('T1_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
         if self.type2.address == address and (name:=("WristMonitor",self.type2.address)) in connections:
             self.type2.id = 2
 
             self.type2.lsl_eda = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_EDA', 'EDA', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
+                StreamInfo('T2_EDA', 'biosignal:EDA', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
             self.type2.lsl_eda_config = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_EDA_CONFIG', 'EDA_CONFIG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
+                StreamInfo('T2_EDA_CONFIG', 'biosignal:EDA_CONFIG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
             self.type2.lsl_ta = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T2_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type2.lsl_st = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_ST', 'ST', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+                StreamInfo('T2_ST', 'biosignal:ST', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
             self.type2.lsl_acc = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_ACC', 'ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T2_ACC', 'controller/biosignal:ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type2.lsl_gyr = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T2_GYR', 'controller/biosignal:GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type2.lsl_bat = StreamOutlet(
-                StreamInfo('Nano33IoT_Wrist_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+                StreamInfo('T2_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+            self.type2.lsl_tonic = StreamOutlet(
+                StreamInfo('T2_TONIC', 'biosignal:TONIC', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
         if self.type3.address == address and (name:=("ChestMonitor",self.type3.address)) in connections:
             self.type3.id = 3
             self.type3.lsl_ecg = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_ECG', 'ECG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
+                StreamInfo('T3_ECG', 'biosignal:ECG', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
             self.type3.lsl_hr = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_HR', 'HR', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+                StreamInfo('T3_HR', 'biosignal:HR', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
             self.type3.lsl_br = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_BR', 'BR', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
+                StreamInfo('T3_BR', 'biosignal:BR', 1, lsl.IRREGULAR_RATE, 'int16', 'OWN'))
             self.type3.lsl_ta = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T3_TA', 'TA', 1, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type3.lsl_acc = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_ACC', 'ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T3_ACC', 'controller/biosignal:ACC', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type3.lsl_gyr = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_GYR', 'GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
+                StreamInfo('T3_GYR', 'controller/biosignal:GYR', 3, lsl.IRREGULAR_RATE, 'float32', 'LSM6DS3'))
             self.type3.lsl_bat = StreamOutlet(
-                StreamInfo('Nano33IoT_Chest_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
+                StreamInfo('T3_BAT', 'BAT', 1, lsl.IRREGULAR_RATE, 'float32', 'OWN'))
 
     async def disconnect_device(self):
         """Desconecta el dispositivo seleccionado."""
@@ -362,14 +367,14 @@ class Window(ctk.CTk):
         try:
             connection = connections[(name,address)]
             await connection.disconnect()
-            self.check_type(address, connection)
-            self.restart_blemanager(address)
+            self._check_type(address, connection)
+            self._restart_blemanager(address)
             connections.pop((name,address))
             CTkMessagebox(title="Desconexión", message="Dispositivo desconectado correctamente.", icon="check")
         except Exception as e:
             CTkMessagebox(title="Error de desconexión", message="Dispositivo no disponible", icon="cancel")
 
-    def restart_blemanager(self, address):
+    def _restart_blemanager(self, address):
         """Reinicia los valores de los dispositivos BLE que se desconectan"""
 
         connected_addresses = [address for _,address in connections.keys()]
@@ -379,7 +384,6 @@ class Window(ctk.CTk):
             self.type1.lsl_gyr = None
             self.type1.lsl_bat = None
         if self.type2.address == address and self.type2.address in connected_addresses:
-            self.type2.eda_config = None
             self.type2.lsl_eda = None
             self.type2.lsl_eda_config = None
             self.type2.lsl_ta = None
@@ -399,29 +403,33 @@ class Window(ctk.CTk):
     async def connect_all(self):
         """Conecta todos los dispositivos encontrados en la lista de dispositivos."""
 
-        if not self.type1 and not self.type2 and not self.type3:
+        if not self.type1.name and not self.type2.name and not self.type3.name:
             CTkMessagebox(title="Error de conexión", message="No se ha encontrado ningún dispositivo", icon="cancel")
             return
         addresses_connected = [address for _,address in connections.keys()]
-        if self.type1.address and self.type1.address not in addresses_connected:
-            connection = BleakClient(self.type1.address)
-            await connection.connect()
-            self.check_type(self.type1.address, connection)
-            connections[("LegMonitor",self.type1.address)] = connection
-            self.initialite_blemanager(self.type1.address)
-        if self.type2.address and self.type2.address not in addresses_connected:
-            connection = BleakClient(self.type2.address)
-            await connection.connect()
-            self.check_type(self.type2.address, connection)
-            connections[("WristMonitor",self.type2.address)] = connection
-            self.initialite_blemanager(self.type2.address)
-        if self.type3.address and self.type3.address not in addresses_connected:
-            connection = BleakClient(self.type3.address)
-            await connection.connect()
-            self.check_type(self.type3.address, connection)
-            connections[("ChestMonitor",self.type3.address)] = connection
-            self.initialite_blemanager(self.type3.address)
-        CTkMessagebox(title="Conexión", message="Todos los dispositivos conectados correctamente.", icon="check")
+        try:
+            if self.type1.address and self.type1.address not in addresses_connected:
+                connection = BleakClient(self.type1.address)
+                await connection.connect()
+                self._check_type(self.type1.address, connection)
+                connections[("LegMonitor",self.type1.address)] = connection
+                self._initialite_blemanager(self.type1.address)
+            if self.type2.address and self.type2.address not in addresses_connected:
+                connection = BleakClient(self.type2.address)
+                await connection.connect()
+                self._check_type(self.type2.address, connection)
+                connections[("WristMonitor",self.type2.address)] = connection
+                self._initialite_blemanager(self.type2.address)
+            if self.type3.address and self.type3.address not in addresses_connected:
+                connection = BleakClient(self.type3.address)
+                await connection.connect()
+                self._check_type(self.type3.address, connection)
+                connections[("ChestMonitor",self.type3.address)] = connection
+                self._initialite_blemanager(self.type3.address)
+            CTkMessagebox(title="Conexión", message="Todos los dispositivos conectados correctamente.", icon="check")
+        except Exception as e:
+            CTkMessagebox(title="Error de desconexión", message="Un dispositivo no está disponible", icon="cancel")
+        
         
     async def disconnect_all(self):
         """Desconecta todos los dispositivos conectados."""
@@ -431,11 +439,14 @@ class Window(ctk.CTk):
 
         global connections
         connections_copy = connections.copy()
+        if connections_copy == {}:
+            CTkMessagebox(title="Error de desconexión", message="No se ha conectado ningún dispositivo", icon="cancel")
+            return
         for name,address in connections.keys():
             connection = connections[(name,address)]
             await connection.disconnect()
-            self.check_type(address, connection)
-            self.restart_blemanager(address)
+            self._check_type(address, connection)
+            self._restart_blemanager(address)
             connections_copy.pop((name,address))
         connections = connections_copy
         CTkMessagebox(title="Desconexión", message="Todos los dispositivos desconectados correctamente.", icon="check")
@@ -451,20 +462,22 @@ class Window(ctk.CTk):
             self.subscribed_connections.append(self.type1)
             connection = connections[("LegMonitor",self.type1.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type1.address, connection)
+            self._check_type(self.type1.address, connection)
         if self.type2.address in connected_addresses and self.type2 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type2, self)
             self.subscribed_connections.append(self.type2)
             connection = connections[("WristMonitor",self.type2.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type2.address, connection)
+            self._check_type(self.type2.address, connection)
         if self.type3.address in connected_addresses and self.type3 not in self.subscribed_connections:
             manager = self.MeasurementManager(self.type3, self)
             self.subscribed_connections.append(self.type3)
             connection = connections[("ChestMonitor",self.type3.address)]
             await connection.start_notify(CH_FRAME, manager.handle_notification)
-            self.check_type(self.type3.address, connection)
+            self._check_type(self.type3.address, connection)
         CTkMessagebox(title="Medición", message="Medición iniciada.")
+
+        
     
     async def stop_measurement(self):
         """Detiene la medición de los dispositivos conectados."""
@@ -483,7 +496,7 @@ class Window(ctk.CTk):
                     self.subscribed_connections.remove(self.type2)
                 if connection.address == self.type3.address:
                     self.subscribed_connections.remove(self.type3)
-                self.check_type(connection.address, connection)
+                self._check_type(connection.address, connection)
         CTkMessagebox(title="Medición", message="Medición detenida.")
 
     class MeasurementManager:
@@ -491,6 +504,15 @@ class Window(ctk.CTk):
             if isinstance(window, Window):
                 self.mblemanager = blemanager
                 self.window = window
+
+                # Variables de medición del Tipo 3
+                self.list_rr = [0, 0, 0, 0, 0, 0, 0]
+                self.manu_detector = RTQRS(sizeBuffer=250, overlap=50)
+                self.last_rr = 0
+                self.rr_aux = 0
+                self.list_rr = [0, 0, 0, 0, 0, 0, 0]
+                self.paso = 200
+                self.datos = []
             
         def handle_notification(self, sender: str, data: bytearray):
             """Procesa las notificaciones de las características."""
@@ -498,15 +520,16 @@ class Window(ctk.CTk):
                 r_acc, r_gyr, r_bat, r_ta = self.get_leg_data(data)
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
             elif self.mblemanager.name == "WristMonitor":
+                
                 r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config = self.get_wrist_data(data)
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
-                self._process_single_data(r_eda, self.mblemanager.lsl_eda)
                 self._process_single_data(r_st, self.mblemanager.lsl_st)
                 self._process_single_data(r_eda_config, self.mblemanager.lsl_eda_config)
+                self._proccess_eda_data(r_eda)
             elif self.mblemanager.name == "ChestMonitor":
                 r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta = self.get_chest_data(data)
                 self._process_data(r_acc, r_gyr, r_bat, r_ta)
-                self._process_single_data(r_ecg, self.mblemanager.lsl_ecg)
+                self._process_ecg_data(r_ecg)
                 self._process_single_data(r_br, self.mblemanager.lsl_br)
         
         def _process_data(self, r_acc, r_gyr, r_bat, r_ta):
@@ -523,6 +546,39 @@ class Window(ctk.CTk):
             for e in r_data:
                 lsl_stream.push_sample([e])
 
+        def _process_ecg_data(self, r_ecg):
+            for e in r_ecg:
+                self.mblemanager.lsl_ecg.push_sample([e])
+
+                self.datos.append(e)
+                if len(self.datos) >= 250:
+                    res = self.manu_detector.realTimeQRSDetection(np.array(self.datos))
+                    if len(res) > 0:
+                        for element in res:
+                            self.rr_aux = self.list_rr.pop(0)
+                            self.rr_aux = 12480 / (element - self.last_rr)
+                            self.list_rr.append(self.rr_aux)
+                            self.mblemanager.lsl_hr.push_sample([np.median(self.list_rr)])
+                            self.last_rr = element
+                    if self.last_rr > 210:
+                        self.datos = []
+                        self.last_rr = self.last_rr - 250
+                    else:
+                        self.datos = self.datos[200:250]
+                        self.last_rr = self.last_rr - 200
+
+        def _proccess_eda_data(self, r_eda):
+            eda_list = [0] * 26 * 2  # [0]*Fs*window_height
+            eda_over = 26  # 50% window
+            eda_count = 0
+            for e in r_eda:
+                self.mblemanager.lsl_eda.push_sample([e])
+                aux = eda_list.pop(0)
+                eda_list.append(e)
+                if eda_count == eda_over:
+                    self.mblemanager.lsl_tonic.push_sample([np.mean(eda_list)])
+                    eda_count = 0
+
         def get_leg_data(self, data):
             """Obtiene los datos de la pierna"""
 
@@ -534,10 +590,10 @@ class Window(ctk.CTk):
                 gyr = bytearray(data[12:24])
                 bat = bytearray(data[24:26])
                 ta = bytearray(data[26:28])
-                r_acc = accRead(acc)
-                r_gyr = gyrRead(gyr)
-                r_bat = batRead(bat)
-                r_ta = taRead(ta)
+                r_acc = acc_read(acc)
+                r_gyr = gyr_read(gyr)
+                r_bat = bat_read(bat)
+                r_ta = ta_read(ta)
                 return r_acc, r_gyr, r_bat, r_ta
     
         def get_wrist_data(self,data):
@@ -555,13 +611,16 @@ class Window(ctk.CTk):
                 st = bytearray(data[32:34])
                 eda_config = bytearray(data[34:36])
                 r_eda = bytearray2uint16list(eda)
-                r_acc = accRead(acc)
-                r_gyr = gyrRead(gyr)
-                r_bat = batRead(bat)
-                r_ta = taRead(ta)
-                r_st = stRead(st)
+                r_acc = acc_read(acc)
+                r_gyr = gyr_read(gyr)
+                r_bat = bat_read(bat)
+                r_ta = ta_read(ta)
+                r_st = st_read(st)
                 r_eda_config = bytearray2uint16list(eda_config)
-                return r_eda, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
+                r_eda_us = list()
+                for rs in r_eda:
+                    r_eda_us.append(get_eda_siemens(rs, r_eda_config[0]))
+                return r_eda_us, r_acc, r_gyr, r_bat, r_ta, r_st, r_eda_config
         
         def get_chest_data(self,data):
             """Obtiene los datos del pecho"""
@@ -577,11 +636,11 @@ class Window(ctk.CTk):
                 bat = bytearray(data[60:62])
                 ta = bytearray(data[62:64])
                 r_ecg = bytearray2uint16list(ecg)
-                r_acc = accRead(acc)
-                r_gyr = gyrRead(gyr)
+                r_acc = acc_read(acc)
+                r_gyr = gyr_read(gyr)
                 r_br = bytearray2uint16list(br)
-                r_bat = batRead(bat)
-                r_ta = taRead(ta)
+                r_bat = bat_read(bat)
+                r_ta = ta_read(ta)
                 return r_ecg, r_acc, r_gyr, r_br, r_bat, r_ta
 
 
