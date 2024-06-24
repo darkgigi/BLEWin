@@ -76,7 +76,7 @@ def bat_read(br: bytearray) -> list:
         aux = br[2 * j:2 * j + 2]
         mf = int.from_bytes(aux, byteorder='little', signed=False)
         ax = float(mf) * 3.3 / 1023.0           # Lectura de un convertidor analógico-digital de 10 bits con referencia a 3.3V
-        ax = 5 * ax / 3                         # 0V = 0%, 3V = 100%
+        ax = 5 * ax / 3                         
         mr.append(ax)
     return mr
 
